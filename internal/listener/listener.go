@@ -18,6 +18,7 @@ type gcsNotification struct {
 	Name   string `json:"name"`
 }
 
+// Run starts listening on a Pub/Sub subscription for GCS notifications.
 func Run(ctx context.Context, cfg *config.Config) error {
 	client, err := pubsub.NewClient(ctx, cfg.ProjectID)
 	if err != nil {
@@ -47,7 +48,8 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	return err
 }
 
-func handleMessage(ctx context.Context, msg *pubsub.Message, storageClient *storage.Client, cfg *config.Config) {
+// handleMessage processes a single GCS notification and downloads the file if needed.
+func handleMessage(ctx context.Context, msg *pubsub.Message, client *storage.Client, cfg *config.Config) {
 	logger := slog.Default()
 
 	var notif gcsNotification
@@ -57,12 +59,13 @@ func handleMessage(ctx context.Context, msg *pubsub.Message, storageClient *stor
 		return
 	}
 
+	// Only process .probundle files
 	if !strings.HasSuffix(notif.Name, ".probundle") {
 		msg.Ack()
 		return
 	}
 
-	if err := downloader.Download(ctx, storageClient, cfg, notif.Name); err != nil {
+	if err := downloader.Download(ctx, client, cfg, notif.Name); err != nil {
 		logger.Error("download failed, nacking for redelivery", "object", notif.Name, "error", err)
 		msg.Nack()
 		return
