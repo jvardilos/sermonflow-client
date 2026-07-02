@@ -12,30 +12,27 @@ import (
 	"cloud.google.com/go/storage"
 )
 
-type ObjectReader interface {
-	NewReader(ctx context.Context) (io.ReadCloser, error)
-}
-
-type BucketHandle interface {
-	Object(name string) ObjectReader
-}
-
-type StorageClient interface {
-	Bucket(name string) BucketHandle
-}
-
-func Download(ctx context.Context, client StorageClient, cfg *config.Config, objectName string) error {
-	logger := slog.Default()
-
-	filename := filepath.Base(objectName)
-	destination := filepath.Join(cfg.WorkspaceDir, filename)
-	partial := destination + ".part"
-
+// Download fetches a file from GCS and saves it to the workspace.
+func Download(ctx context.Context, client *storage.Client, cfg *config.Config, objectName string) error {
 	reader, err := client.Bucket(cfg.Bucket).Object(objectName).NewReader(ctx)
 	if err != nil {
 		return fmt.Errorf("open reader: %w", err)
 	}
 	defer reader.Close()
+
+	filename := filepath.Base(objectName)
+	destination := filepath.Join(cfg.WorkspaceDir, filename)
+
+	return saveFile(destination, reader)
+}
+
+// saveFile writes an io.ReadCloser to disk atomically using a temporary file.
+// This is the testable core logic, separate from cloud client concerns.
+func saveFile(destination string, reader io.ReadCloser) error {
+	defer reader.Close()
+
+	logger := slog.Default()
+	partial := destination + ".part"
 
 	tmpFile, err := os.Create(partial)
 	if err != nil {
@@ -58,31 +55,6 @@ func Download(ctx context.Context, client StorageClient, cfg *config.Config, obj
 		return fmt.Errorf("rename to destination: %w", err)
 	}
 
-	logger.Info("downloaded bundle", "object", objectName, "destination", destination)
+	logger.Info("downloaded bundle", "destination", destination)
 	return nil
-}
-
-// Adapter to make *storage.Client compatible with StorageClient interface
-type storageClientAdapter struct {
-	*storage.Client
-}
-
-func (a *storageClientAdapter) Bucket(name string) BucketHandle {
-	return &bucketHandleAdapter{a.Client.Bucket(name)}
-}
-
-type bucketHandleAdapter struct {
-	*storage.BucketHandle
-}
-
-func (a *bucketHandleAdapter) Object(name string) ObjectReader {
-	return &objectHandleAdapter{a.BucketHandle.Object(name)}
-}
-
-type objectHandleAdapter struct {
-	*storage.ObjectHandle
-}
-
-func (a *objectHandleAdapter) NewReader(ctx context.Context) (io.ReadCloser, error) {
-	return a.ObjectHandle.NewReader(ctx)
 }
