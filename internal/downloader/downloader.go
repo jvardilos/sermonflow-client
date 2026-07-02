@@ -12,7 +12,19 @@ import (
 	"cloud.google.com/go/storage"
 )
 
-func Download(ctx context.Context, client *storage.Client, cfg *config.Config, objectName string) error {
+type ObjectReader interface {
+	NewReader(ctx context.Context) (io.ReadCloser, error)
+}
+
+type BucketHandle interface {
+	Object(name string) ObjectReader
+}
+
+type StorageClient interface {
+	Bucket(name string) BucketHandle
+}
+
+func Download(ctx context.Context, client StorageClient, cfg *config.Config, objectName string) error {
 	logger := slog.Default()
 
 	filename := filepath.Base(objectName)
@@ -48,4 +60,29 @@ func Download(ctx context.Context, client *storage.Client, cfg *config.Config, o
 
 	logger.Info("downloaded bundle", "object", objectName, "destination", destination)
 	return nil
+}
+
+// Adapter to make *storage.Client compatible with StorageClient interface
+type storageClientAdapter struct {
+	*storage.Client
+}
+
+func (a *storageClientAdapter) Bucket(name string) BucketHandle {
+	return &bucketHandleAdapter{a.Client.Bucket(name)}
+}
+
+type bucketHandleAdapter struct {
+	*storage.BucketHandle
+}
+
+func (a *bucketHandleAdapter) Object(name string) ObjectReader {
+	return &objectHandleAdapter{a.BucketHandle.Object(name)}
+}
+
+type objectHandleAdapter struct {
+	*storage.ObjectHandle
+}
+
+func (a *objectHandleAdapter) NewReader(ctx context.Context) (io.ReadCloser, error) {
+	return a.ObjectHandle.NewReader(ctx)
 }
