@@ -1,0 +1,64 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Connect to running process",
+			"type": "go",
+			"request": "attach",
+			"mode": "local",
+			"processId": "${command:pickGoProcess}"
+		},
+		{
+			"name": "Run sermonflow-client",
+			"type": "go",
+			"request": "launch",
+			"mode": "debug",
+			"program": "${workspaceFolder}/cmd/sermonflow-client",
+			"env": {
+				"GOOGLE_APPLICATION_CREDENTIALS": "${workspaceFolder}/.env.local/creds.json",
+				"GCP_PROJECT_ID": "your-project-id",
+				"PUBSUB_SUBSCRIPTION": "your-subscription",
+				"GCS_BUCKET": "your-bucket",
+				"PROPRESENTER_WORKSPACE_DIR": "${workspaceFolder}/.workspace"
+			},
+			"args": [],
+			"showLog": true
+		},
+		{
+			"name": "Test config package",
+			"type": "go",
+			"request": "launch",
+			"mode": "test",
+			"program": "${workspaceFolder}/internal/config",
+			"args": ["-test.v"],
+			"showLog": true
+		},
+		{
+			"name": "Test listener package",
+			"type": "go",
+			"request": "launch",
+			"mode": "test",
+			"program": "${workspaceFolder}/internal/listener",
+			"args": ["-test.v"],
+			"showLog": true
+		},
+		{
+			"name": "Test downloader package",
+			"type": "go",
+			"request": "launch",
+			"mode": "test",
+			"program": "${workspaceFolder}/internal/downloader",
+			"args": ["-test.v"],
+			"showLog": true
+		},
+		{
+			"name": "Test all packages",
+			"type": "go",
+			"request": "launch",
+			"mode": "test",
+			"program": "${workspaceFolder}/...",
+			"args": ["-test.v", "-test.cover"],
+			"showLog": true
+		}
+	]
+}

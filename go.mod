@@ -4,7 +4,10 @@ go 1.26.4
 
 require cloud.google.com/go/storage v1.63.0
 
-require go.opencensus.io v0.24.0 // indirect
+require (
+	cloud.google.com/go/secretmanager v1.20.0 // indirect
+	go.opencensus.io v0.24.0 // indirect
+)
 
 require (
 	cel.dev/expr v0.25.1 // indirect

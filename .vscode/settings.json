@@ -1,0 +1,40 @@
+{
+	"go.lintOnSave": "package",
+	"go.lintTool": "golangci-lint",
+	"go.lintFlags": [
+		"--timeout=5m"
+	],
+	"go.useCodeSnippetsOnFunctionSuggest": true,
+	"go.useCodeSnippetsOnFunctionSuggestWithoutType": true,
+	"go.autocompleteUnimportedPackages": true,
+	"go.diagnostic.semanticsError": "error",
+	"go.tests.commandArgs": ["-v", "-race", "-count=1"],
+	"go.testEnvVars": {
+		"CGO_ENABLED": "1"
+	},
+	"go.testTimeout": "30s",
+	"gopls": {
+		"ui.diagnostic.annotations": {
+			"bounds": true,
+			"escape": true,
+			"inline": true,
+			"nil": true
+		},
+		"formatting.gofumpt": false,
+		"formatting.local": "sermonflow-client"
+	},
+	"[go]": {
+		"editor.codeActionsOnSave": {
+			"source.organizeImports": "explicit"
+		},
+		"editor.formatOnSave": true,
+		"editor.defaultFormatter": "golang.go"
+	},
+	"editor.codeActionsOnSave": {
+		"source.fixAll": "explicit"
+	},
+	"files.exclude": {
+		"**/.DS_Store": true,
+		"**/bin": true
+	}
+}

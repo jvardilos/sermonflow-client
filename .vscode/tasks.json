@@ -1,0 +1,91 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "go: test all",
+			"type": "shell",
+			"command": "go",
+			"args": ["test", "-v", "./..."],
+			"problemMatcher": ["$go"],
+			"group": {
+				"kind": "test",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "go: test with coverage",
+			"type": "shell",
+			"command": "go",
+			"args": ["test", "-v", "-cover", "./..."],
+			"problemMatcher": ["$go"],
+			"group": "test"
+		},
+		{
+			"label": "go: test config",
+			"type": "shell",
+			"command": "go",
+			"args": ["test", "-v", "./internal/config"],
+			"problemMatcher": ["$go"],
+			"group": "test"
+		},
+		{
+			"label": "go: test listener",
+			"type": "shell",
+			"command": "go",
+			"args": ["test", "-v", "./internal/listener"],
+			"problemMatcher": ["$go"],
+			"group": "test"
+		},
+		{
+			"label": "go: test downloader",
+			"type": "shell",
+			"command": "go",
+			"args": ["test", "-v", "./internal/downloader"],
+			"problemMatcher": ["$go"],
+			"group": "test"
+		},
+		{
+			"label": "go: generate coverage report",
+			"type": "shell",
+			"command": "go",
+			"args": ["test", "-coverprofile=coverage.out", "./..."],
+			"problemMatcher": ["$go"],
+			"group": "test"
+		},
+		{
+			"label": "go: view coverage",
+			"type": "shell",
+			"command": "go",
+			"args": ["tool", "cover", "-html=coverage.out"],
+			"dependsOn": "go: generate coverage report",
+			"group": "test"
+		},
+		{
+			"label": "go: build",
+			"type": "shell",
+			"command": "go",
+			"args": ["build", "-o", "bin/sermonflow-client", "./cmd/sermonflow-client"],
+			"problemMatcher": ["$go"],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			}
+		},
+		{
+			"label": "go: lint",
+			"type": "shell",
+			"command": "go",
+			"args": ["vet", "./..."],
+			"problemMatcher": ["$go"],
+			"group": "test"
+		},
+		{
+			"label": "go: run",
+			"type": "shell",
+			"command": "go",
+			"args": ["run", "./cmd/sermonflow-client"],
+			"problemMatcher": ["$go"],
+			"group": "none"
+		}
+	]
+}

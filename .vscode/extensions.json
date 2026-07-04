@@ -1,0 +1,11 @@
+{
+	"recommendations": [
+		"golang.go",
+		"golang.tools",
+		"github.copilot",
+		"eamodio.gitlens",
+		"charliermarsh.ruff",
+		"ms-vscode.makefile-tools",
+		"streetsidesoftware.code-spell-checker"
+	]
+}

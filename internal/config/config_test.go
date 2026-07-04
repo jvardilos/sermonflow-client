@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -154,6 +155,15 @@ func TestLoadWorkspaceDirIsFile(t *testing.T) {
 	}
 	if !contains(err.Error(), "PROPRESENTER_WORKSPACE_DIR") {
 		t.Errorf("error should mention workspace dir, got: %v", err)
+	}
+}
+
+func TestGetConfigValuePreferesEnvVar(t *testing.T) {
+	t.Setenv("TEST_VAR", "from-env")
+	// Even though we can't mock Secret Manager in this test, we verify env var takes precedence
+	val := getConfigValue(context.Background(), "TEST_VAR", "non-existent-secret")
+	if val != "from-env" {
+		t.Errorf("getConfigValue should prefer env var, got %q", val)
 	}
 }
 
