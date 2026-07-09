@@ -1,2 +1,5 @@
 sermonflow-client
 .env
+credentials.json
+*.probundle
+*.pro

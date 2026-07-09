@@ -14,11 +14,16 @@ func TestLoadSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	librariesDir := filepath.Join(tmpDir, "Libraries")
+	os.MkdirAll(librariesDir, 0755)
+
 	t.Setenv("GOOGLE_APPLICATION_CREDENTIALS", credFile)
 	t.Setenv("GCP_PROJECT_ID", "test-project")
 	t.Setenv("PUBSUB_SUBSCRIPTION", "test-sub")
 	t.Setenv("GCS_BUCKET", "test-bucket")
 	t.Setenv("PROPRESENTER_WORKSPACE_DIR", tmpDir)
+	t.Setenv("PP_LIBRARY_ROOT", librariesDir)
+	t.Setenv("PP_API_BASE_URL", "http://localhost:50000")
 
 	cfg, err := Load()
 	if err != nil {
@@ -50,27 +55,27 @@ func TestLoadMissingEnvVars(t *testing.T) {
 	}{
 		{
 			name:     "missing GCP_PROJECT_ID",
-			setVars:  map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "creds", "PUBSUB_SUBSCRIPTION": "sub", "GCS_BUCKET": "bucket", "PROPRESENTER_WORKSPACE_DIR": "/tmp"},
+			setVars:  map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "creds", "PUBSUB_SUBSCRIPTION": "sub", "GCS_BUCKET": "bucket", "PROPRESENTER_WORKSPACE_DIR": "/tmp", "PP_LIBRARY_ROOT": "/lib", "PP_API_BASE_URL": "http://localhost"},
 			wantMiss: "GCP_PROJECT_ID",
 		},
 		{
 			name:     "missing PUBSUB_SUBSCRIPTION",
-			setVars:  map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "creds", "GCP_PROJECT_ID": "proj", "GCS_BUCKET": "bucket", "PROPRESENTER_WORKSPACE_DIR": "/tmp"},
+			setVars:  map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "creds", "GCP_PROJECT_ID": "proj", "GCS_BUCKET": "bucket", "PROPRESENTER_WORKSPACE_DIR": "/tmp", "PP_LIBRARY_ROOT": "/lib", "PP_API_BASE_URL": "http://localhost"},
 			wantMiss: "PUBSUB_SUBSCRIPTION",
 		},
 		{
 			name:     "missing GCS_BUCKET",
-			setVars:  map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "creds", "GCP_PROJECT_ID": "proj", "PUBSUB_SUBSCRIPTION": "sub", "PROPRESENTER_WORKSPACE_DIR": "/tmp"},
+			setVars:  map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "creds", "GCP_PROJECT_ID": "proj", "PUBSUB_SUBSCRIPTION": "sub", "PROPRESENTER_WORKSPACE_DIR": "/tmp", "PP_LIBRARY_ROOT": "/lib", "PP_API_BASE_URL": "http://localhost"},
 			wantMiss: "GCS_BUCKET",
 		},
 		{
 			name:     "missing PROPRESENTER_WORKSPACE_DIR",
-			setVars:  map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "creds", "GCP_PROJECT_ID": "proj", "PUBSUB_SUBSCRIPTION": "sub", "GCS_BUCKET": "bucket"},
+			setVars:  map[string]string{"GOOGLE_APPLICATION_CREDENTIALS": "creds", "GCP_PROJECT_ID": "proj", "PUBSUB_SUBSCRIPTION": "sub", "GCS_BUCKET": "bucket", "PP_LIBRARY_ROOT": "/lib", "PP_API_BASE_URL": "http://localhost"},
 			wantMiss: "PROPRESENTER_WORKSPACE_DIR",
 		},
 		{
 			name:     "missing GOOGLE_APPLICATION_CREDENTIALS",
-			setVars:  map[string]string{"GCP_PROJECT_ID": "proj", "PUBSUB_SUBSCRIPTION": "sub", "GCS_BUCKET": "bucket", "PROPRESENTER_WORKSPACE_DIR": "/tmp"},
+			setVars:  map[string]string{"GCP_PROJECT_ID": "proj", "PUBSUB_SUBSCRIPTION": "sub", "GCS_BUCKET": "bucket", "PROPRESENTER_WORKSPACE_DIR": "/tmp", "PP_LIBRARY_ROOT": "/lib", "PP_API_BASE_URL": "http://localhost"},
 			wantMiss: "GOOGLE_APPLICATION_CREDENTIALS",
 		},
 	}
@@ -99,6 +104,8 @@ func TestLoadCredsFileNotFound(t *testing.T) {
 	t.Setenv("PUBSUB_SUBSCRIPTION", "test-sub")
 	t.Setenv("GCS_BUCKET", "test-bucket")
 	t.Setenv("PROPRESENTER_WORKSPACE_DIR", "/tmp")
+	t.Setenv("PP_LIBRARY_ROOT", "/lib")
+	t.Setenv("PP_API_BASE_URL", "http://localhost")
 
 	_, err := Load()
 	if err == nil {
@@ -121,6 +128,8 @@ func TestLoadWorkspaceDirNotFound(t *testing.T) {
 	t.Setenv("PUBSUB_SUBSCRIPTION", "test-sub")
 	t.Setenv("GCS_BUCKET", "test-bucket")
 	t.Setenv("PROPRESENTER_WORKSPACE_DIR", "/nonexistent/workspace")
+	t.Setenv("PP_LIBRARY_ROOT", "/lib")
+	t.Setenv("PP_API_BASE_URL", "http://localhost")
 
 	_, err := Load()
 	if err == nil {
@@ -148,6 +157,8 @@ func TestLoadWorkspaceDirIsFile(t *testing.T) {
 	t.Setenv("PUBSUB_SUBSCRIPTION", "test-sub")
 	t.Setenv("GCS_BUCKET", "test-bucket")
 	t.Setenv("PROPRESENTER_WORKSPACE_DIR", workspaceFile)
+	t.Setenv("PP_LIBRARY_ROOT", "/lib")
+	t.Setenv("PP_API_BASE_URL", "http://localhost")
 
 	_, err := Load()
 	if err == nil {

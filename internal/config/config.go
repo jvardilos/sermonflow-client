@@ -8,11 +8,14 @@ import (
 )
 
 type Config struct {
-	CredentialsPath string
-	ProjectID       string
-	Subscription    string
-	Bucket          string
-	WorkspaceDir    string
+	CredentialsPath    string
+	ProjectID          string
+	Subscription       string
+	Bucket             string
+	WorkspaceDir       string
+	PPLibraryRoot      string
+	PPAPIBaseURL       string
+	PPAPIPassword      string
 }
 
 // Load reads configuration from environment variables or GCP Secret Manager.
@@ -29,6 +32,9 @@ func LoadWithContext(ctx context.Context) (*Config, error) {
 		Subscription:    getConfigValue(ctx, "PUBSUB_SUBSCRIPTION", "pubsub-subscription"),
 		Bucket:          getConfigValue(ctx, "GCS_BUCKET", "gcs-bucket"),
 		WorkspaceDir:    getConfigValue(ctx, "PROPRESENTER_WORKSPACE_DIR", "workspace-dir"),
+		PPLibraryRoot:   getConfigValue(ctx, "PP_LIBRARY_ROOT", "pp-library-root"),
+		PPAPIBaseURL:    getConfigValue(ctx, "PP_API_BASE_URL", "pp-api-base-url"),
+		PPAPIPassword:   getConfigValue(ctx, "PP_API_PASSWORD", "pp-api-password"),
 	}
 
 	required := map[string]string{
@@ -37,6 +43,8 @@ func LoadWithContext(ctx context.Context) (*Config, error) {
 		"PUBSUB_SUBSCRIPTION":            cfg.Subscription,
 		"GCS_BUCKET":                     cfg.Bucket,
 		"PROPRESENTER_WORKSPACE_DIR":     cfg.WorkspaceDir,
+		"PP_LIBRARY_ROOT":                cfg.PPLibraryRoot,
+		"PP_API_BASE_URL":                cfg.PPAPIBaseURL,
 	}
 
 	var missing []string

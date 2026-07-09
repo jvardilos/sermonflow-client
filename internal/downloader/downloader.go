@@ -7,12 +7,15 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+
+	"sermonflow-client/internal/bundle"
 	"sermonflow-client/internal/config"
+	"sermonflow-client/internal/propresenter"
 
 	"cloud.google.com/go/storage"
 )
 
-// Download fetches a file from GCS and saves it to the workspace.
+// Download fetches a file from GCS, unpacks it, and triggers ProPresenter.
 func Download(ctx context.Context, client *storage.Client, cfg *config.Config, objectName string) error {
 	reader, err := client.Bucket(cfg.Bucket).Object(objectName).NewReader(ctx)
 	if err != nil {
@@ -23,7 +26,30 @@ func Download(ctx context.Context, client *storage.Client, cfg *config.Config, o
 	filename := filepath.Base(objectName)
 	destination := filepath.Join(cfg.WorkspaceDir, filename)
 
-	return saveFile(destination, reader)
+	// Download the bundle to a temporary location
+	if err := saveFile(destination, reader); err != nil {
+		return err
+	}
+
+	// Derive Media/Assets root from Libraries root
+	// If Libraries root is /path/to/ProPresenter/Libraries,
+	// Media/Assets root is /path/to/ProPresenter/Media/Assets
+	mediaAssetsRoot := filepath.Join(filepath.Dir(cfg.PPLibraryRoot), "Media", "Assets")
+	profileRoot := filepath.Join(filepath.Dir(cfg.PPLibraryRoot), "Libraries", "Sermonflow")
+
+	// Unpack the bundle to two locations
+	result, err := bundle.UnpackToDestinations(destination, profileRoot, mediaAssetsRoot)
+	if err != nil {
+		return fmt.Errorf("unpack bundle: %w", err)
+	}
+
+	// Trigger ProPresenter to load the presentation
+	ppClient := propresenter.NewClient(cfg.PPAPIBaseURL, cfg.PPAPIPassword)
+	if err := ppClient.TriggerPresentation(result.ProFile); err != nil {
+		return fmt.Errorf("trigger presentation: %w", err)
+	}
+
+	return nil
 }
 
 // saveFile writes an io.ReadCloser to disk atomically using a temporary file.
