@@ -15,14 +15,15 @@
 			"mode": "debug",
 			"program": "${workspaceFolder}/cmd/sermonflow-client",
 			"env": {
-				"GOOGLE_APPLICATION_CREDENTIALS": "${workspaceFolder}/.env.local/creds.json",
-				"GCP_PROJECT_ID": "your-project-id",
-				"PUBSUB_SUBSCRIPTION": "your-subscription",
-				"GCS_BUCKET": "your-bucket",
-				"PROPRESENTER_WORKSPACE_DIR": "${workspaceFolder}/.workspace"
+				"GOOGLE_APPLICATION_CREDENTIALS": "${workspaceFolder}/credentials.json",
+				"GCP_PROJECT_ID": "project-1a6a8036-8e9b-4c44-98e",
+				"PUBSUB_SUBSCRIPTION": "sermonflow-slide-computer",
+				"GCS_BUCKET": "sermonflow-io",
+				"PROPRESENTER_LIBRARY_ROOT": "/Users/jvardi/Library/Application Support/RenewedVision/ProPresenter/UserWorkspaces/ProPresenter/",
+				"PROPRESENTER_API_URL": "http://10.0.0.33:53450"
 			},
-			"args": [],
-			"showLog": true
+			"args": []
+			// "showLog": true
 		},
 		{
 			"name": "Test config package",
@@ -30,7 +31,9 @@
 			"request": "launch",
 			"mode": "test",
 			"program": "${workspaceFolder}/internal/config",
-			"args": ["-test.v"],
+			"args": [
+				"-test.v"
+			],
 			"showLog": true
 		},
 		{
@@ -39,7 +42,9 @@
 			"request": "launch",
 			"mode": "test",
 			"program": "${workspaceFolder}/internal/listener",
-			"args": ["-test.v"],
+			"args": [
+				"-test.v"
+			],
 			"showLog": true
 		},
 		{
@@ -48,7 +53,9 @@
 			"request": "launch",
 			"mode": "test",
 			"program": "${workspaceFolder}/internal/downloader",
-			"args": ["-test.v"],
+			"args": [
+				"-test.v"
+			],
 			"showLog": true
 		},
 		{
@@ -57,7 +64,10 @@
 			"request": "launch",
 			"mode": "test",
 			"program": "${workspaceFolder}/...",
-			"args": ["-test.v", "-test.cover"],
+			"args": [
+				"-test.v",
+				"-test.cover"
+			],
 			"showLog": true
 		}
 	]

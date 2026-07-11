@@ -4,60 +4,128 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"log/slog"
 	"os"
+	"path"
 	"path/filepath"
 
-	"sermonflow-client/internal/bundle"
 	"sermonflow-client/internal/config"
+	"sermonflow-client/internal/presentation"
 	"sermonflow-client/internal/propresenter"
 
 	"cloud.google.com/go/storage"
 )
 
-// Download fetches a file from GCS, unpacks it, and triggers ProPresenter.
-func Download(ctx context.Context, client *storage.Client, cfg *config.Config, objectName string) error {
-	reader, err := client.Bucket(cfg.Bucket).Object(objectName).NewReader(ctx)
-	if err != nil {
-		return fmt.Errorf("open reader: %w", err)
+// Sync downloads a presentation described by a presentation.json object in
+// GCS: media assets go to Media/Assets, the .pro file goes to the Sermonflow
+// library, and ProPresenter is triggered once everything is in place.
+func Sync(ctx context.Context, client *storage.Client, cfg *config.Config, manifestObject string) error {
+	bucket := client.Bucket(cfg.Bucket)
+
+	// All other objects live under the same GCS prefix as the manifest,
+	// e.g. "output/presentation.json" -> "output/".
+	prefix := path.Dir(manifestObject)
+	if prefix == "." {
+		prefix = ""
 	}
-	defer reader.Close()
 
-	filename := filepath.Base(objectName)
-	destination := filepath.Join(cfg.WorkspaceDir, filename)
-
-	// Download the bundle to a temporary location
-	if err := saveFile(destination, reader); err != nil {
+	p, err := fetchPresentation(ctx, bucket, manifestObject)
+	if err != nil {
 		return err
 	}
 
-	// Derive Media/Assets root from Libraries root
-	// If Libraries root is /path/to/ProPresenter/Libraries,
-	// Media/Assets root is /path/to/ProPresenter/Media/Assets
+	// Derive local roots from the ProPresenter library root.
 	mediaAssetsRoot := filepath.Join(filepath.Dir(cfg.PPLibraryRoot), "Media", "Assets")
-	profileRoot := filepath.Join(filepath.Dir(cfg.PPLibraryRoot), "Libraries", "Sermonflow")
+	libraryRoot := filepath.Join(filepath.Dir(cfg.PPLibraryRoot), "Libraries", "Sermonflow")
 
-	// Unpack the bundle to two locations
-	result, err := bundle.UnpackToDestinations(destination, profileRoot, mediaAssetsRoot)
-	if err != nil {
-		return fmt.Errorf("unpack bundle: %w", err)
+	fmt.Printf("manifest gs://%s/%s: presentation %q, %d assets\n",
+		cfg.Bucket, manifestObject, p.Name, len(p.Assets))
+
+	if err := os.MkdirAll(mediaAssetsRoot, 0755); err != nil {
+		return fmt.Errorf("create media assets root: %w", err)
+	}
+	if err := os.MkdirAll(libraryRoot, 0755); err != nil {
+		return fmt.Errorf("create library root: %w", err)
 	}
 
-	// Trigger ProPresenter to load the presentation
+	// Assets first, so the presentation never references missing media.
+	for _, asset := range p.Assets {
+		object := path.Join(prefix, asset)
+		destination := filepath.Join(mediaAssetsRoot, filepath.FromSlash(asset))
+		if err := pull(ctx, bucket, cfg.Bucket, object, destination); err != nil {
+			return fmt.Errorf("asset %s: %w", asset, err)
+		}
+	}
+
+	proDestination := filepath.Join(libraryRoot, p.ProFile())
+	if err := pull(ctx, bucket, cfg.Bucket, path.Join(prefix, p.ProFile()), proDestination); err != nil {
+		return fmt.Errorf("pro file: %w", err)
+	}
+
+	fmt.Printf("synced presentation %q: %d assets -> %s, pro file -> %s\n",
+		p.Name, len(p.Assets), mediaAssetsRoot, proDestination)
+
 	ppClient := propresenter.NewClient(cfg.PPAPIBaseURL, cfg.PPAPIPassword)
-	if err := ppClient.TriggerPresentation(result.ProFile); err != nil {
+	if err := ppClient.TriggerPresentation(proDestination); err != nil {
 		return fmt.Errorf("trigger presentation: %w", err)
 	}
 
 	return nil
 }
 
-// saveFile writes an io.ReadCloser to disk atomically using a temporary file.
-// This is the testable core logic, separate from cloud client concerns.
-func saveFile(destination string, reader io.ReadCloser) error {
+// fetchPresentation downloads and parses the presentation.json object.
+func fetchPresentation(ctx context.Context, bucket *storage.BucketHandle, object string) (*presentation.Presentation, error) {
+	reader, err := bucket.Object(object).NewReader(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("open manifest %s: %w", object, err)
+	}
 	defer reader.Close()
 
-	logger := slog.Default()
+	data, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, fmt.Errorf("read manifest %s: %w", object, err)
+	}
+
+	return presentation.Parse(data)
+}
+
+// pull fetches a GCS object to a local path, writing atomically. It skips
+// the download when the local file already matches the object's size.
+func pull(ctx context.Context, bucket *storage.BucketHandle, bucketName, object, destination string) error {
+	reader, err := bucket.Object(object).NewReader(ctx)
+	if err != nil {
+		return fmt.Errorf("open %s: %w", object, err)
+	}
+	defer reader.Close()
+
+	if info, err := os.Stat(destination); err == nil && info.Size() == reader.Attrs.Size {
+		fmt.Printf("  up to date  %s (%s)\n", destination, formatSize(info.Size()))
+		return nil
+	}
+
+	fmt.Printf("  pulling     gs://%s/%s -> %s (%s)\n",
+		bucketName, object, destination, formatSize(reader.Attrs.Size))
+
+	if err := os.MkdirAll(filepath.Dir(destination), 0755); err != nil {
+		return fmt.Errorf("create directory for %s: %w", destination, err)
+	}
+
+	if err := saveFile(destination, reader); err != nil {
+		return fmt.Errorf("save %s: %w", object, err)
+	}
+	return nil
+}
+
+// formatSize renders a byte count as a human-readable string.
+func formatSize(bytes int64) string {
+	const mb = 1024 * 1024
+	if bytes < mb {
+		return fmt.Sprintf("%.1f KB", float64(bytes)/1024)
+	}
+	return fmt.Sprintf("%.1f MB", float64(bytes)/mb)
+}
+
+// saveFile writes an io.Reader to disk atomically using a temporary file.
+func saveFile(destination string, reader io.Reader) error {
 	partial := destination + ".part"
 
 	tmpFile, err := os.Create(partial)
@@ -81,6 +149,5 @@ func saveFile(destination string, reader io.ReadCloser) error {
 		return fmt.Errorf("rename to destination: %w", err)
 	}
 
-	logger.Info("downloaded bundle", "destination", destination)
 	return nil
 }

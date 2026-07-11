@@ -5,9 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"path"
 	"sermonflow-client/internal/config"
 	"sermonflow-client/internal/downloader"
-	"strings"
 
 	"cloud.google.com/go/pubsub/v2"
 	"cloud.google.com/go/storage"
@@ -59,17 +59,25 @@ func handleMessage(ctx context.Context, msg *pubsub.Message, client *storage.Cli
 		return
 	}
 
-	// Only process .probundle files
-	if !strings.HasSuffix(notif.Name, ".probundle") {
+	// Only act on the manifest; notifications for individual assets are
+	// ignored. If the manifest lands before its assets, the sync fails and
+	// the nack below gets it redelivered.
+	if !isManifest(notif.Name) {
 		msg.Ack()
 		return
 	}
 
-	if err := downloader.Download(ctx, client, cfg, notif.Name); err != nil {
-		logger.Error("download failed, nacking for redelivery", "object", notif.Name, "error", err)
+	if err := downloader.Sync(ctx, client, cfg, notif.Name); err != nil {
+		logger.Error("sync failed, nacking for redelivery", "object", notif.Name, "error", err)
 		msg.Nack()
 		return
 	}
 
 	msg.Ack()
+}
+
+// isManifest reports whether a GCS object is a presentation manifest
+// (the presentation.json the pipeline writes next to the decoded files).
+func isManifest(objectName string) bool {
+	return path.Base(objectName) == "presentation.json"
 }

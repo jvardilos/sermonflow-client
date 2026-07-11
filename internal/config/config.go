@@ -8,14 +8,13 @@ import (
 )
 
 type Config struct {
-	CredentialsPath    string
-	ProjectID          string
-	Subscription       string
-	Bucket             string
-	WorkspaceDir       string
-	PPLibraryRoot      string
-	PPAPIBaseURL       string
-	PPAPIPassword      string
+	CredentialsPath string
+	ProjectID       string
+	Subscription    string
+	Bucket          string
+	PPLibraryRoot   string
+	PPAPIBaseURL    string
+	PPAPIPassword   string
 }
 
 // Load reads configuration from environment variables or GCP Secret Manager.
@@ -31,10 +30,9 @@ func LoadWithContext(ctx context.Context) (*Config, error) {
 		ProjectID:       getConfigValue(ctx, "GCP_PROJECT_ID", "gcp-project-id"),
 		Subscription:    getConfigValue(ctx, "PUBSUB_SUBSCRIPTION", "pubsub-subscription"),
 		Bucket:          getConfigValue(ctx, "GCS_BUCKET", "gcs-bucket"),
-		WorkspaceDir:    getConfigValue(ctx, "PROPRESENTER_WORKSPACE_DIR", "workspace-dir"),
-		PPLibraryRoot:   getConfigValue(ctx, "PP_LIBRARY_ROOT", "pp-library-root"),
-		PPAPIBaseURL:    getConfigValue(ctx, "PP_API_BASE_URL", "pp-api-base-url"),
-		PPAPIPassword:   getConfigValue(ctx, "PP_API_PASSWORD", "pp-api-password"),
+		PPLibraryRoot:   getConfigValue(ctx, "PROPRESENTER_LIBRARY_ROOT", "propresenter-library-root"),
+		PPAPIBaseURL:    getConfigValue(ctx, "PROPRESENTER_API_URL", "propresenter-api-url"),
+		PPAPIPassword:   getConfigValue(ctx, "PROPRESENTER_API_PASSWORD", "propresenter-api-password"),
 	}
 
 	required := map[string]string{
@@ -42,9 +40,8 @@ func LoadWithContext(ctx context.Context) (*Config, error) {
 		"GCP_PROJECT_ID":                 cfg.ProjectID,
 		"PUBSUB_SUBSCRIPTION":            cfg.Subscription,
 		"GCS_BUCKET":                     cfg.Bucket,
-		"PROPRESENTER_WORKSPACE_DIR":     cfg.WorkspaceDir,
-		"PP_LIBRARY_ROOT":                cfg.PPLibraryRoot,
-		"PP_API_BASE_URL":                cfg.PPAPIBaseURL,
+		"PROPRESENTER_LIBRARY_ROOT":      cfg.PPLibraryRoot,
+		"PROPRESENTER_API_URL":           cfg.PPAPIBaseURL,
 	}
 
 	var missing []string
@@ -59,10 +56,6 @@ func LoadWithContext(ctx context.Context) (*Config, error) {
 
 	if _, err := os.Stat(cfg.CredentialsPath); os.IsNotExist(err) {
 		return nil, fmt.Errorf("GOOGLE_APPLICATION_CREDENTIALS does not exist: %s", cfg.CredentialsPath)
-	}
-
-	if info, err := os.Stat(cfg.WorkspaceDir); os.IsNotExist(err) || !info.IsDir() {
-		return nil, fmt.Errorf("PROPRESENTER_WORKSPACE_DIR does not exist or is not a directory: %s", cfg.WorkspaceDir)
 	}
 
 	return cfg, nil

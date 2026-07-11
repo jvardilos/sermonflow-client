@@ -15,8 +15,8 @@ func TestGCSNotificationParsing(t *testing.T) {
 	}{
 		{
 			name: "valid notification",
-			json: `{"bucket":"my-bucket","name":"file.probundle"}`,
-			want: gcsNotification{Bucket: "my-bucket", Name: "file.probundle"},
+			json: `{"bucket":"my-bucket","name":"output/presentation.json"}`,
+			want: gcsNotification{Bucket: "my-bucket", Name: "output/presentation.json"},
 		},
 		{
 			name: "missing name field",
@@ -44,33 +44,31 @@ func TestGCSNotificationParsing(t *testing.T) {
 	}
 }
 
-// TestProbundleFilter tests that we correctly filter for .probundle files.
-func TestProbundleFilter(t *testing.T) {
+// TestIsManifest tests that only manifest.json objects trigger a sync.
+func TestIsManifest(t *testing.T) {
 	tests := []struct {
 		name       string
 		objectName string
 		want       bool
 	}{
-		{"simple probundle", "test.probundle", true},
-		{"nested probundle", "path/to/test.probundle", true},
-		{"txt file", "test.txt", false},
-		{"missing extension", "probundle", false},
-		{"wrong extension", "test.bundle", false},
+		{"bare manifest", "presentation.json", true},
+		{"nested manifest", "output/presentation.json", true},
+		{"deeply nested manifest", "a/b/c/presentation.json", true},
+		{"asset file", "output/Boss.mov", false},
+		{"pro file", "output/Presentation.pro", false},
+		{"probundle", "output/Presentation.probundle", false},
+		{"probundle sidecar json", "output/Presentation.probundle.json", false},
+		{"legacy manifest json", "output/manifest.json", false},
+		{"manifest-like suffix", "output/not-presentation.json", false},
+		{"empty name", "", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := isProbundle(tt.objectName)
+			got := isManifest(tt.objectName)
 			if got != tt.want {
-				t.Errorf("isProbundle(%q) = %v, want %v", tt.objectName, got, tt.want)
+				t.Errorf("isManifest(%q) = %v, want %v", tt.objectName, got, tt.want)
 			}
 		})
 	}
-}
-
-// isProbundle checks if a filename is a .probundle file.
-// This is the testable business logic extracted from handleMessage.
-func isProbundle(objectName string) bool {
-	const ext = ".probundle"
-	return len(objectName) >= len(ext) && objectName[len(objectName)-len(ext):] == ext
 }
