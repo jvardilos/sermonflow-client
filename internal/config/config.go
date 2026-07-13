@@ -13,8 +13,6 @@ type Config struct {
 	Subscription    string
 	Bucket          string
 	PPLibraryRoot   string
-	PPAPIBaseURL    string
-	PPAPIPassword   string
 }
 
 // Load reads configuration from environment variables or GCP Secret Manager.
@@ -31,8 +29,6 @@ func LoadWithContext(ctx context.Context) (*Config, error) {
 		Subscription:    getConfigValue(ctx, "PUBSUB_SUBSCRIPTION", "pubsub-subscription"),
 		Bucket:          getConfigValue(ctx, "GCS_BUCKET", "gcs-bucket"),
 		PPLibraryRoot:   getConfigValue(ctx, "PROPRESENTER_LIBRARY_ROOT", "propresenter-library-root"),
-		PPAPIBaseURL:    getConfigValue(ctx, "PROPRESENTER_API_URL", "propresenter-api-url"),
-		PPAPIPassword:   getConfigValue(ctx, "PROPRESENTER_API_PASSWORD", "propresenter-api-password"),
 	}
 
 	required := map[string]string{
@@ -41,7 +37,6 @@ func LoadWithContext(ctx context.Context) (*Config, error) {
 		"PUBSUB_SUBSCRIPTION":            cfg.Subscription,
 		"GCS_BUCKET":                     cfg.Bucket,
 		"PROPRESENTER_LIBRARY_ROOT":      cfg.PPLibraryRoot,
-		"PROPRESENTER_API_URL":           cfg.PPAPIBaseURL,
 	}
 
 	var missing []string

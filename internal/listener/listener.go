@@ -36,9 +36,10 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	subscriptionPath := fmt.Sprintf("projects/%s/subscriptions/%s", cfg.ProjectID, cfg.Subscription)
 	logger.Info("listening on subscription", "subscription", subscriptionPath)
 
+	syncer := downloader.New(storageClient, cfg)
 	subscriber := client.Subscriber(subscriptionPath)
 	err = subscriber.Receive(ctx, func(innerCtx context.Context, msg *pubsub.Message) {
-		handleMessage(innerCtx, msg, storageClient, cfg)
+		handleMessage(innerCtx, msg, syncer)
 	})
 
 	if err == context.Canceled {
@@ -48,8 +49,9 @@ func Run(ctx context.Context, cfg *config.Config) error {
 	return err
 }
 
-// handleMessage processes a single GCS notification and downloads the file if needed.
-func handleMessage(ctx context.Context, msg *pubsub.Message, client *storage.Client, cfg *config.Config) {
+// handleMessage processes a single GCS notification and syncs the
+// presentation it announces, if any.
+func handleMessage(ctx context.Context, msg *pubsub.Message, syncer *downloader.Syncer) {
 	logger := slog.Default()
 
 	var notif gcsNotification
@@ -67,7 +69,10 @@ func handleMessage(ctx context.Context, msg *pubsub.Message, client *storage.Cli
 		return
 	}
 
-	if err := downloader.Sync(ctx, client, cfg, notif.Name); err != nil {
+	// Sync only fails when files couldn't be downloaded — that's worth a
+	// retry. An unchanged manifest is a no-op, and a ProPresenter trigger
+	// failure is logged inside Sync rather than retried.
+	if err := syncer.Sync(ctx, notif.Name); err != nil {
 		logger.Error("sync failed, nacking for redelivery", "object", notif.Name, "error", err)
 		msg.Nack()
 		return

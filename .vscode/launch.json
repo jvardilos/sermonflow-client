@@ -2,13 +2,6 @@
 	"version": "0.2.0",
 	"configurations": [
 		{
-			"name": "Connect to running process",
-			"type": "go",
-			"request": "attach",
-			"mode": "local",
-			"processId": "${command:pickGoProcess}"
-		},
-		{
 			"name": "Run sermonflow-client",
 			"type": "go",
 			"request": "launch",
@@ -19,56 +12,10 @@
 				"GCP_PROJECT_ID": "project-1a6a8036-8e9b-4c44-98e",
 				"PUBSUB_SUBSCRIPTION": "sermonflow-slide-computer",
 				"GCS_BUCKET": "sermonflow-io",
-				"PROPRESENTER_LIBRARY_ROOT": "/Users/jvardi/Library/Application Support/RenewedVision/ProPresenter/UserWorkspaces/ProPresenter/",
-				"PROPRESENTER_API_URL": "http://10.0.0.33:53450"
+				"PROPRESENTER_LIBRARY_ROOT": "/Users/jvardi/Library/Application Support/RenewedVision/ProPresenter/UserWorkspaces/ProPresenter/"
 			},
 			"args": []
 			// "showLog": true
 		},
-		{
-			"name": "Test config package",
-			"type": "go",
-			"request": "launch",
-			"mode": "test",
-			"program": "${workspaceFolder}/internal/config",
-			"args": [
-				"-test.v"
-			],
-			"showLog": true
-		},
-		{
-			"name": "Test listener package",
-			"type": "go",
-			"request": "launch",
-			"mode": "test",
-			"program": "${workspaceFolder}/internal/listener",
-			"args": [
-				"-test.v"
-			],
-			"showLog": true
-		},
-		{
-			"name": "Test downloader package",
-			"type": "go",
-			"request": "launch",
-			"mode": "test",
-			"program": "${workspaceFolder}/internal/downloader",
-			"args": [
-				"-test.v"
-			],
-			"showLog": true
-		},
-		{
-			"name": "Test all packages",
-			"type": "go",
-			"request": "launch",
-			"mode": "test",
-			"program": "${workspaceFolder}/...",
-			"args": [
-				"-test.v",
-				"-test.cover"
-			],
-			"showLog": true
-		}
 	]
 }

@@ -10,16 +10,38 @@ import (
 
 	"sermonflow-client/internal/config"
 	"sermonflow-client/internal/presentation"
-	"sermonflow-client/internal/propresenter"
 
 	"cloud.google.com/go/storage"
 )
 
-// Sync downloads a presentation described by a presentation.json object in
-// GCS: media assets go to Media/Assets, the .pro file goes to the Sermonflow
-// library, and ProPresenter is triggered once everything is in place.
-func Sync(ctx context.Context, client *storage.Client, cfg *config.Config, manifestObject string) error {
-	bucket := client.Bucket(cfg.Bucket)
+// Syncer downloads presentations from GCS and remembers which manifest
+// version it last synced, so redelivered or duplicate notifications for an
+// unchanged presentation.json are no-ops.
+type Syncer struct {
+	client *storage.Client
+	cfg    *config.Config
+	// lastSynced maps a manifest object name to the GCS generation that was
+	// last synced successfully. GCS bumps the generation on every overwrite,
+	// so an unchanged generation means there is nothing new to sync.
+	lastSynced map[string]int64
+}
+
+// New creates a Syncer.
+func New(client *storage.Client, cfg *config.Config) *Syncer {
+	return &Syncer{
+		client:     client,
+		cfg:        cfg,
+		lastSynced: make(map[string]int64),
+	}
+}
+
+// Sync downloads the presentation described by a presentation.json object in
+// GCS: media assets go to Media/Assets and the .pro file goes to the
+// Sermonflow library, where ProPresenter picks it up automatically. It does
+// nothing when the manifest hasn't changed since the last successful sync.
+// A returned error means the sync failed and is worth retrying.
+func (s *Syncer) Sync(ctx context.Context, manifestObject string) error {
+	bucket := s.client.Bucket(s.cfg.Bucket)
 
 	// All other objects live under the same GCS prefix as the manifest,
 	// e.g. "output/presentation.json" -> "output/".
@@ -28,17 +50,23 @@ func Sync(ctx context.Context, client *storage.Client, cfg *config.Config, manif
 		prefix = ""
 	}
 
-	p, err := fetchPresentation(ctx, bucket, manifestObject)
+	p, generation, err := fetchPresentation(ctx, bucket, manifestObject)
 	if err != nil {
 		return err
 	}
 
-	// Derive local roots from the ProPresenter library root.
-	mediaAssetsRoot := filepath.Join(filepath.Dir(cfg.PPLibraryRoot), "Media", "Assets")
-	libraryRoot := filepath.Join(filepath.Dir(cfg.PPLibraryRoot), "Libraries", "Sermonflow")
+	if s.lastSynced[manifestObject] == generation {
+		fmt.Printf("manifest gs://%s/%s unchanged (generation %d), nothing to sync\n",
+			s.cfg.Bucket, manifestObject, generation)
+		return nil
+	}
 
-	fmt.Printf("manifest gs://%s/%s: presentation %q, %d assets\n",
-		cfg.Bucket, manifestObject, p.Name, len(p.Assets))
+	// Derive local roots from the ProPresenter library root.
+	mediaAssetsRoot := filepath.Join(filepath.Dir(s.cfg.PPLibraryRoot), "Media", "Assets")
+	libraryRoot := filepath.Join(filepath.Dir(s.cfg.PPLibraryRoot), "Libraries", "Sermonflow")
+
+	fmt.Printf("manifest gs://%s/%s (generation %d): presentation %q, %d assets\n",
+		s.cfg.Bucket, manifestObject, generation, p.Name, len(p.Assets))
 
 	if err := os.MkdirAll(mediaAssetsRoot, 0755); err != nil {
 		return fmt.Errorf("create media assets root: %w", err)
@@ -51,41 +79,42 @@ func Sync(ctx context.Context, client *storage.Client, cfg *config.Config, manif
 	for _, asset := range p.Assets {
 		object := path.Join(prefix, asset)
 		destination := filepath.Join(mediaAssetsRoot, filepath.FromSlash(asset))
-		if err := pull(ctx, bucket, cfg.Bucket, object, destination); err != nil {
+		if err := pull(ctx, bucket, s.cfg.Bucket, object, destination); err != nil {
 			return fmt.Errorf("asset %s: %w", asset, err)
 		}
 	}
 
 	proDestination := filepath.Join(libraryRoot, p.ProFile())
-	if err := pull(ctx, bucket, cfg.Bucket, path.Join(prefix, p.ProFile()), proDestination); err != nil {
+	if err := pull(ctx, bucket, s.cfg.Bucket, path.Join(prefix, p.ProFile()), proDestination); err != nil {
 		return fmt.Errorf("pro file: %w", err)
 	}
 
+	s.lastSynced[manifestObject] = generation
 	fmt.Printf("synced presentation %q: %d assets -> %s, pro file -> %s\n",
 		p.Name, len(p.Assets), mediaAssetsRoot, proDestination)
-
-	ppClient := propresenter.NewClient(cfg.PPAPIBaseURL, cfg.PPAPIPassword)
-	if err := ppClient.TriggerPresentation(proDestination); err != nil {
-		return fmt.Errorf("trigger presentation: %w", err)
-	}
 
 	return nil
 }
 
-// fetchPresentation downloads and parses the presentation.json object.
-func fetchPresentation(ctx context.Context, bucket *storage.BucketHandle, object string) (*presentation.Presentation, error) {
+// fetchPresentation downloads and parses the presentation.json object,
+// returning the parsed presentation and the object's GCS generation.
+func fetchPresentation(ctx context.Context, bucket *storage.BucketHandle, object string) (*presentation.Presentation, int64, error) {
 	reader, err := bucket.Object(object).NewReader(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("open manifest %s: %w", object, err)
+		return nil, 0, fmt.Errorf("open manifest %s: %w", object, err)
 	}
 	defer reader.Close()
 
 	data, err := io.ReadAll(reader)
 	if err != nil {
-		return nil, fmt.Errorf("read manifest %s: %w", object, err)
+		return nil, 0, fmt.Errorf("read manifest %s: %w", object, err)
 	}
 
-	return presentation.Parse(data)
+	p, err := presentation.Parse(data)
+	if err != nil {
+		return nil, 0, err
+	}
+	return p, reader.Attrs.Generation, nil
 }
 
 // pull fetches a GCS object to a local path, writing atomically. It skips
@@ -104,10 +133,6 @@ func pull(ctx context.Context, bucket *storage.BucketHandle, bucketName, object,
 
 	fmt.Printf("  pulling     gs://%s/%s -> %s (%s)\n",
 		bucketName, object, destination, formatSize(reader.Attrs.Size))
-
-	if err := os.MkdirAll(filepath.Dir(destination), 0755); err != nil {
-		return fmt.Errorf("create directory for %s: %w", destination, err)
-	}
 
 	if err := saveFile(destination, reader); err != nil {
 		return fmt.Errorf("save %s: %w", object, err)
@@ -135,17 +160,14 @@ func saveFile(destination string, reader io.Reader) error {
 	defer tmpFile.Close()
 
 	if _, err := io.Copy(tmpFile, reader); err != nil {
-		os.Remove(partial)
 		return fmt.Errorf("copy data: %w", err)
 	}
 
 	if err := tmpFile.Close(); err != nil {
-		os.Remove(partial)
 		return fmt.Errorf("close temporary file: %w", err)
 	}
 
 	if err := os.Rename(partial, destination); err != nil {
-		os.Remove(partial)
 		return fmt.Errorf("rename to destination: %w", err)
 	}
 
