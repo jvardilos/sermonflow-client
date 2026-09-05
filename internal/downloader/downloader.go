@@ -157,7 +157,20 @@ func saveFile(destination string, reader io.Reader) error {
 	if err != nil {
 		return fmt.Errorf("create temporary file: %w", err)
 	}
-	defer tmpFile.Close()
+
+	// Any path that does not reach a successful rename must leave nothing
+	// behind. The .part staging exists so ProPresenter never sees a
+	// half-written asset under its real name; that guarantee is only half kept
+	// if the truncated file survives under a name one suffix away from the one
+	// the show references. It also accumulates, and this client prunes and
+	// reports on the contents of the media directory.
+	renamed := false
+	defer func() {
+		tmpFile.Close() // no-op once closed below; the error is not actionable
+		if !renamed {
+			os.Remove(partial)
+		}
+	}()
 
 	if _, err := io.Copy(tmpFile, reader); err != nil {
 		return fmt.Errorf("copy data: %w", err)
@@ -171,5 +184,6 @@ func saveFile(destination string, reader io.Reader) error {
 		return fmt.Errorf("rename to destination: %w", err)
 	}
 
+	renamed = true
 	return nil
 }

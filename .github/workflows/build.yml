@@ -23,6 +23,7 @@ jobs:
       - name: go vet
         run: go vet ./...
 
-      # No test step: this repo has no _test.go files yet. When it gets them,
-      # add `go test ./...` here rather than leaving the suite to run only on
-      # whichever machine remembers.
+      - name: go test
+        # Unpiped on purpose: a pipe would report the exit code of the pipe's
+        # last stage and a red suite would ship as green.
+        run: go test ./...
